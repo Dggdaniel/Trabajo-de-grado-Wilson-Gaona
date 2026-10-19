@@ -52,15 +52,11 @@ git/
 │
 ├── 03_modelos_estadisticos_y_ml/
 │   ├── 01_modelos_estadisticos_referencia.py        # SCRIPT DE ESTADÍSTICA TRADICIONAL: Logit Ordenado & Regresión WLS
-│   ├── 02_evaluacion_group_kfold.py                 # SCRIPT DE ML: Evaluación 10-Folds GroupKFold + Holdout 10% (Ridge & LightGBM)
-│   └── 04_ejecutar_seleccion.py                     # SCRIPT CON CHECKPOINT: Ejecución con reanudación automática por modelo
+│   └── 02_evaluacion_group_kfold.py                 # SCRIPT DE ML: Evaluación 10-Folds GroupKFold + Holdout 10% (Ridge & LightGBM)
 │
-├── 04_visualizacion_y_figuras/
-│   ├── generar_figuras_exactas.py                   # SCRIPT DE FIGURAS: Distribuciones, boxplots por quintil y curvas LOWESS (300 DPI)
-│   └── figura_r2_final.py                           # SCRIPT DE FIGURA 7: Comparación de R² (±1 DE) para los 24 modelos (300 DPI)
-│
-└── documentacion/
-    └── mas fuentes para citar.txt                   # Referencias y citas bibliográficas adicionales
+└── 04_visualizacion_y_figuras/
+    ├── generar_figuras_exactas.py                   # SCRIPT DE FIGURAS 1-6: Distribuciones, boxplots por quintil y curvas LOWESS (300 DPI)
+    └── figura_r2_final.py                           # SCRIPT DE FIGURA 7: Comparación de R² (±1 DE) para los 24 modelos (300 DPI)
 ```
 
 ---

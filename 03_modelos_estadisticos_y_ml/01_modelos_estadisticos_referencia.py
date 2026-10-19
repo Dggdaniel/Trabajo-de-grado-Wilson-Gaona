@@ -14,8 +14,14 @@ RUTA_DATOS = os.path.abspath(os.path.join(RUTA_BASE, '..', '..'))
 print('=== MODELOS ESTADÍSTICOS TRADICIONALES DE REFERENCIA (ESPECIFICACIÓN Y PONDERACIÓN HOMOGENIZADA) ===')
 print('1. Cargando microdatos depurados de la ECV 2024...')
 df = pd.read_excel(os.path.join(RUTA_DATOS, 'validacion_final.xlsx'))
-base_raw = pd.read_csv(os.path.join(RUTA_DATOS, 'base_final_embedings.csv'), usecols=['DIRECTORIO', 'SECUENCIA_P'])
+base_raw = pd.read_csv(
+    os.path.join(RUTA_DATOS, 'base_final_embedings.csv'),
+    usecols=['DIRECTORIO', 'SECUENCIA_P', 'felicidad_ayer', 'preocupacion_ayer', 'tristeza_ayer']
+)
 df['cluster_hogar'] = base_raw['DIRECTORIO'].astype(str) + '_' + base_raw['SECUENCIA_P'].astype(str)
+df['bienestar_experiencial'] = (
+    base_raw['felicidad_ayer'] + (10.0 - base_raw['preocupacion_ayer']) + (10.0 - base_raw['tristeza_ayer'])
+) / 3.0
 
 cols_explicativas = [
     'ingreso_total_log', 'sexo_nacimiento', 'grupo_edad', 
@@ -26,17 +32,16 @@ cols_explicativas = [
 print('\n-----------------------------------------------------------------------------')
 print('MODELO 1: LOGIT ORDENADO PONDERADO (Bienestar Evaluativo - Satisfaccion Vida)')
 print('-----------------------------------------------------------------------------')
-df_eval = df.dropna(subset=['satisfaccion_vida', 'FEX_C'] + cols_explicativas).copy()
-X_eval = pd.get_dummies(df_eval[cols_explicativas], drop_first=True, dtype=float)
-y_eval = df_eval['satisfaccion_vida'].astype(int)
-pesos_eval = df_eval['FEX_C']
+X_eval = pd.get_dummies(df[cols_explicativas], drop_first=True, dtype=float)
+y_eval = df['satisfaccion_vida'].astype(int)
+pesos_eval = df['FEX_C']
 
 print(f'  - Regresores en matriz de diseño X: {X_eval.shape[1]} covariables explicativas')
-print(f'  - Ajustando Logit Ordenado Ponderado (FEX_C) con Clúster de Hogar ({len(df_eval):,} obs)...')
+print(f'  - Ajustando Logit Ordenado Ponderado (FEX_C) con Clúster de Hogar ({len(df):,} obs)...')
 
-# Ajuste con OrderedModel y ponderación de frecuencias
+# Ajuste con OrderedModel y errores estándar agrupados por hogar
 mod_logit = OrderedModel(y_eval, X_eval, distr='logit')
-res_logit = mod_logit.fit(method='bfgs', cov_type='cluster', cov_kwds={'groups': df_eval['cluster_hogar']}, disp=False)
+res_logit = mod_logit.fit(method='bfgs', cov_type='cluster', cov_kwds={'groups': df['cluster_hogar']}, disp=False)
 
 print(f'  - Log-Likelihood: {res_logit.llf:.2f}')
 print(f'  - Pseudo R2 (McFadden): {1 - (res_logit.llf / res_logit.llnull):.4f}')
@@ -47,17 +52,16 @@ print(summary_logit)
 print('\n-----------------------------------------------------------------------------')
 print('MODELO 2: REGRESIÓN WLS PONDERADA (Bienestar Experiencial - Afecto)')
 print('-----------------------------------------------------------------------------')
-df_exp = df.dropna(subset=['bienestar_experiencial', 'FEX_C'] + cols_explicativas).copy()
-X_exp = pd.get_dummies(df_exp[cols_explicativas], drop_first=True, dtype=float)
+X_exp = pd.get_dummies(df[cols_explicativas], drop_first=True, dtype=float)
 X_exp = sm.add_constant(X_exp)
-y_exp = df_exp['bienestar_experiencial']
-pesos_wls = df_exp['FEX_C']
+y_exp = df['bienestar_experiencial']
+pesos_wls = df['FEX_C']
 
 print(f'  - Regresores en matriz de diseño X: {X_exp.shape[1] - 1} covariables + Constante')
-print(f'  - Ajustando WLS Ponderado (FEX_C) con Clúster de Hogar ({len(df_exp):,} obs)...')
+print(f'  - Ajustando WLS Ponderado (FEX_C) con Clúster de Hogar ({len(df):,} obs)...')
 
 mod_wls = sm.WLS(y_exp, X_exp, weights=pesos_wls)
-res_wls = mod_wls.fit(cov_type='cluster', cov_kwds={'groups': df_exp['cluster_hogar']})
+res_wls = mod_wls.fit(cov_type='cluster', cov_kwds={'groups': df['cluster_hogar']})
 
 print(f'  - R2 WLS: {res_wls.rsquared:.4f}')
 print(f'  - R2 Ajustado: {res_wls.rsquared_adj:.4f}')

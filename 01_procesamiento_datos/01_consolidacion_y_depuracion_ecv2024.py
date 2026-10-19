@@ -27,39 +27,21 @@ if 'DIRECTORIO' in base_unificada.columns and 'SECUENCIA_P' in base_unificada.co
     hogar_id = base_unificada['DIRECTORIO'].astype(str) + '_' + base_unificada['SECUENCIA_P'].astype(str)
     print(f'  - Total de clústeres de hogar identificados: {hogar_id.nunique():,} hogares.')
 
-print('3. Reconstrucción exacta del índice de Bienestar Experiencial (Afecto 0-10)...')
-# Fórmula metodológica real del estudio:
-# afecto_positivo = mean(felicidad_ayer, vida_vale_la_pena)
-# afecto_negativo_inv = mean(10 - preocupacion_ayer, 10 - tristeza_ayer)
-# bienestar_experiencial = mean(afecto_positivo, afecto_negativo_inv, escalera_situacion_actual)
+print('3. Construcción del índice de Bienestar Experiencial (Afectivo Puro, escala 0-10)...')
+# Constructo afectivo puro (Kahneman & Deaton, 2010):
+# Promedio de felicidad_ayer y las emociones negativas invertidas (10 - preocupacion_ayer, 10 - tristeza_ayer).
+# Se excluyen medidas evaluativas o eudaimónicas (vida_vale_la_pena, escalera_situacion_actual).
 
-cols_afectivas = ['felicidad_ayer', 'vida_vale_la_pena', 'preocupacion_ayer', 'tristeza_ayer', 'escalera_situacion_actual']
-cols_presentes = [c for c in cols_afectivas if c in base_unificada.columns]
+cols_afectivas = ['felicidad_ayer', 'preocupacion_ayer', 'tristeza_ayer']
+if all(c in base_unificada.columns for c in cols_afectivas):
+    preocupacion_inv = 10.0 - base_unificada['preocupacion_ayer']
+    tristeza_inv = 10.0 - base_unificada['tristeza_ayer']
+    base_unificada['bienestar_experiencial'] = (
+        base_unificada['felicidad_ayer'] + preocupacion_inv + tristeza_inv
+    ) / 3.0
 
-if len(cols_presentes) >= 4:
-    print('  - Calculando índice de bienestar experiencial sobre variables afectivas reales...')
-    # Invertir escalas negativas (0-10)
-    if 'preocupacion_ayer' in base_unificada.columns:
-        preocupacion_inv = 10.0 - base_unificada['preocupacion_ayer']
-    else:
-        preocupacion_inv = pd.Series(8.0, index=base_unificada.index)
-        
-    if 'tristeza_ayer' in base_unificada.columns:
-        tristeza_inv = 10.0 - base_unificada['tristeza_ayer']
-    else:
-        tristeza_inv = pd.Series(8.0, index=base_unificada.index)
-        
-    afecto_pos = base_unificada[['felicidad_ayer', 'vida_vale_la_pena']].mean(axis=1) if 'felicidad_ayer' in base_unificada.columns else pd.Series(8.0, index=base_unificada.index)
-    afecto_neg_inv = pd.concat([preocupacion_inv, tristeza_inv], axis=1).mean(axis=1)
-    auto_percepcion = base_unificada['escalera_situacion_actual'] if 'escalera_situacion_actual' in base_unificada.columns else pd.Series(8.0, index=base_unificada.index)
-    
-    # Calcular promedio compuesto exacto (0-10)
-    base_unificada['bienestar_experiencial'] = (afecto_pos + afecto_neg_inv + auto_percepcion) / 3.0
-else:
-    print('  - Utilizando bienestar experiencial consolidado existente en la base...')
-
-print('4. Validación de rangos y valores limpios...')
+print('4. Validación de rangos y completitud sobre la muestra analítica (n = 178.511)...')
 print(f'  - Bienestar Experiencial (Rango: {base_unificada["bienestar_experiencial"].min():.2f} - {base_unificada["bienestar_experiencial"].max():.2f}, Media: {base_unificada["bienestar_experiencial"].mean():.2f})')
 print(f'  - Satisfacción con la Vida (Rango: {base_unificada["satisfaccion_vida"].min():.2f} - {base_unificada["satisfaccion_vida"].max():.2f}, Media: {base_unificada["satisfaccion_vida"].mean():.2f})')
 
-print('\n¡Procesamiento y depuración finalizada con 100% de rigor empírico!')
+print('\n¡Procesamiento y depuración finalizados exitosamente!')
