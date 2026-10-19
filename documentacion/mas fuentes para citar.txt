@@ -1,0 +1,148 @@
+@article{ball2005subjective,
+  author    = {Ball, Richard and Chernova, Kseniya},
+  title     = {Subjective well-being: The role of income, social capital, and race},
+  journal   = {Social Indicators Research},
+  volume    = {72},
+  number    = {2},
+  pages     = {225--240},
+  year      = {2005},
+  doi       = {10.1007/s11205-004-5573-7}
+}
+
+@article{binswanger2006why,
+  author    = {Binswanger, Mathias},
+  title     = {Why does income growth fail to make us happier? Searching for the treadmills behind the paradox of happiness},
+  journal   = {The Journal of Socio-Economics},
+  volume    = {35},
+  number    = {2},
+  pages     = {366--381},
+  year      = {2006},
+  doi       = {10.1016/j.socec.2005.11.040}
+}
+
+@book{cardenas2015dilemas,
+  author    = {Cárdenas Campo, Juan Camilo},
+  title     = {Dilemas de lo colectivo: instituciones, pobreza y cooperación en el manejo local de los recursos de uso común},
+  publisher = {Universidad de los Andes},
+  year      = {2015}
+}
+
+@article{cuadra2003bienestar,
+  author    = {Cuadra, Hernán and Florenzano, Ramón},
+  title     = {El bienestar subjetivo: Hacia una psicología positiva},
+  journal   = {Universitas Psychologica},
+  volume    = {2},
+  number    = {1},
+  pages     = {11--22},
+  year      = {2003}
+}
+
+@article{ditella2001happiness,
+  author    = {Di Tella, R. and MacCulloch, R.},
+  title     = {Happiness adaptation to income and to status in an individual panel},
+  journal   = {Journal of Economic Behavior \& Organization},
+  volume    = {39},
+  number    = {2},
+  pages     = {249--264},
+  year      = {2001},
+  doi       = {10.1016/S0167-2681(99)00125-5}
+}
+
+@book{dunn2013happy,
+  author    = {Dunn, Elizabeth and Norton, Michael},
+  title     = {Happy money: The science of happier spending},
+  publisher = {Simon \& Schuster},
+  year      = {2013}
+}
+
+@article{frey2002happiness,
+  author  = {Frey, Bruno S. and Stutzer, Alois},
+  title   = {What Can Economists Learn from Happiness Research?},
+  journal = {Journal of Economic Literature},
+  volume  = {40},
+  number  = {2},
+  pages   = {402--435},
+  year    = {2002},
+  doi     = {10.1257/002205102320161320}
+}
+
+@book{graham2009happiness,
+  author    = {Graham, Carol},
+  title     = {Happiness Around the World: The Paradox of Happy Peasants and Miserable Millionaires},
+  publisher = {Oxford University Press},
+  year      = {2009}
+}
+
+@book{graham2002happiness,
+  author    = {Graham, Carol and Pettinato, Stefano},
+  title     = {Happiness and Hardship: Opportunity and Insecurity in New Market Economies},
+  publisher = {Brookings Institution Press},
+  year      = {2002},
+  address   = {Washington, D.C.}
+}
+
+@book{helliwell2023world,
+  editor    = {Helliwell, John F. and Layard, Richard and Sachs, Jeffrey D. and De Neve, Jan-Emmanuel},
+  title     = {World Happiness Report 2023},
+  publisher = {Sustainable Development Solutions Network},
+  year      = {2023},
+  url       = {https://worldhappiness.report/ed/2023/}
+}
+
+@article{luttmer2005neighbors,
+  author    = {Luttmer, Erzo F. P.},
+  title     = {Neighbors as negatives: Relative earnings and well-being},
+  journal   = {The Quarterly Journal of Economics},
+  volume    = {120},
+  number    = {3},
+  pages     = {963--1002},
+  year      = {2005},
+  doi       = {10.1093/qje/120.3.963}
+}
+
+@article{mcbride2001relative,
+  author    = {McBride, Michael},
+  title     = {Relative-income effects on subjective well-being in the cross-section},
+  journal   = {Journal of Economic Behavior \& Organization},
+  volume    = {45},
+  number    = {3},
+  pages     = {251--278},
+  year      = {2001},
+  doi       = {10.1016/S0167-2681(01)00145-7}
+}
+@article{rojas2008experienced,
+  author    = {Rojas, Mariano},
+  title     = {Experienced poverty and income poverty in Mexico: A subjective well-being approach},
+  journal   = {World Development},
+  volume    = {36},
+  number    = {6},
+  pages     = {1078--1093},
+  year      = {2008},
+  doi       = {10.1016/j.worlddev.2007.10.005}
+}
+@incollection{rojas2007complexity,
+  author    = {Rojas, Mariano},
+  title     = {The complexity of well-being: A life-satisfaction conception and a domains-of-life approach},
+  booktitle = {Researching Well-Being in Developing Countries: From Theory to Research},
+  editor    = {Gough, Ian and McGregor, Alastair},
+  publisher = {Cambridge University Press},
+  pages     = {242--258},
+  year      = {2007},
+  doi       = {10.1017/CBO9780511488986.013}
+}
+@article{vendrik2007happiness,
+  author    = {Vendrik, Maarten C. M. and Woltjer, Geert B.},
+  title     = {Happiness and loss aversion: Is utility concave or convex in relative income?},
+  journal   = {Journal of Public Economics},
+  volume    = {91},
+  number    = {7--8},
+  pages     = {1423--1448},
+  year      = {2007},
+  doi       = {10.1016/j.jpubeco.2007.02.008}
+}
+@book{wilkinson2009spirit,
+  author    = {Wilkinson, Richard and Pickett, Kate},
+  title     = {The Spirit Level: Why More Equal Societies Almost Always Do Better},
+  publisher = {Allen Lane},
+  year      = {2009}
+}
