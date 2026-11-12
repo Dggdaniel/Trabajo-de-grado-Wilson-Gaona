@@ -16,12 +16,14 @@ warnings.filterwarnings('ignore')
 RUTA_BASE = os.path.dirname(os.path.abspath(__file__))
 RUTA_DATOS = os.path.abspath(os.path.join(RUTA_BASE, '..', '..'))
 
-print('=== PASO 1: CARGANDO MICRODATOS Y LLAVES DE HOGAR (ECV 2024) ===')
+print('=== PASO 1: CARGANDO MICRODATOS Y LLAVES DE HOGAR POR LLAVE COMPUESTA ===')
 base_trabajo = pd.read_excel(os.path.join(RUTA_DATOS, 'validacion_final.xlsx'))
 base_raw = pd.read_csv(os.path.join(RUTA_DATOS, 'base_final_embedings.csv'))
+
+# Llave única compuesta para evitar desalineaciones por posición de fila
 hogar_id = base_raw['DIRECTORIO'].astype(str) + '_' + base_raw['SECUENCIA_P'].astype(str)
 
-print('\n=== PASO 2: CARGANDO VECTORES LATENTES (OPENAI VS. QWEN3 d=1536) ===')
+print('\n=== PASO 2: CARGANDO REPRESENTACIONES VECTORIALES (EMBEDDINGS) ===')
 openai_path = os.path.join(RUTA_DATOS, 'embeding generados con text-embedding-3-small.csv')
 openai_df = pd.read_csv(openai_path).drop(columns=['Unnamed: 0'], errors='ignore')
 openai_df.columns = [f'openai_{c}' for c in openai_df.columns]
@@ -31,7 +33,9 @@ qwen_path = os.path.join(RUTA_DATOS, 'embeding generados con qwen.csv')
 qwen_df = pd.read_csv(qwen_path).drop(columns=['Unnamed: 0'], errors='ignore')
 
 if 'embedding' in qwen_df.columns:
-    qwen_df['embedding'] = qwen_df['embedding'].apply(lambda x: np.fromstring(x.replace('\n', ' ').strip('[]'), sep=' ') if isinstance(x, str) else x)
+    qwen_df['embedding'] = qwen_df['embedding'].apply(
+        lambda x: np.fromstring(x.replace('\n', ' ').strip('[]'), sep=' ') if isinstance(x, str) else x
+    )
     qwen_mat = pd.DataFrame(qwen_df['embedding'].tolist())
 else:
     qwen_mat = qwen_df
@@ -39,7 +43,7 @@ else:
 qwen_mat.columns = [f'qwen_{c}' for c in qwen_mat.columns]
 qwen_mat.index = base_trabajo.index
 
-print('\n=== PASO 3: CONSTRUYENDO MATRIZ DE VARIABLES ESTRUCTURADAS TRADICIONALES (p=25) ===')
+print('\n=== PASO 3: CONSTRUYENDO MATRIZ CLÁSICA / TRADICIONAL ===')
 variables_tradicionales = [
     'sexo_nacimiento', 'FEX_C', 'nivel_educativo_alcanzado',
     'ingreso_total_log', 'estado_conyugal', 'satisfaccion_trabajo',
@@ -53,7 +57,7 @@ base_modelo_ml = base_trabajo[variables_tradicionales + [var_eval]].copy()
 base_modelo_ml['sexo_nacimiento'] = base_modelo_ml['sexo_nacimiento'].astype(str)
 base_modelo_ml['nivel_educativo_alcanzado'] = base_modelo_ml['nivel_educativo_alcanzado'].astype(str)
 
-# Construcción del índice de bienestar experiencial (afectivo puro: emociones del día anterior)
+# Construcción del índice de afecto puro (3 ítems de balance afectivo)
 base_modelo_ml[var_exp_puro] = (
     base_raw['felicidad_ayer'] + base_raw['preocupacion_ayer_inv'] + base_raw['tristeza_ayer_inv']
 ) / 3.0
@@ -68,7 +72,7 @@ X_trad.columns = clean_cols
 X_hib_openai = pd.concat([X_trad, openai_df], axis=1)
 X_hib_qwen = pd.concat([X_trad, qwen_mat], axis=1)
 
-print('\n=== PASO 3.1: CONSTRUYENDO MATRIZ ESTRUCTURADA SATURADA (p=523, SIN FUGA DE DATOS) ===')
+print('\n=== PASO 3.1: CONSTRUYENDO MATRIZ SATURADA COMPLETA Y SATURADA COMPARABLE ===')
 cols_to_drop = [
     'Unnamed: 0', 'DIRECTORIO', 'SECUENCIA_P', 'SECUENCIA_ENCUESTA', 'ORDEN',
     'orden_informante_x', 'orden_informante_y', 'FEX_C', 'FEX', 'PROB_IAG',
@@ -79,41 +83,68 @@ cols_to_drop = [
     'afecto_positivo', 'afecto_negativo',
     'preocupacion_ayer_inv', 'tristeza_ayer_inv', 'afecto_negativo_inv',
 ]
-cols_keep = [c for c in base_raw.columns if c not in cols_to_drop]
-X_raw = base_raw[cols_keep].copy()
 
-cat_cols, num_cols = [], []
-for c in X_raw.columns:
-    if X_raw[c].dtype == 'object' or X_raw[c].nunique() < 15:
-        cat_cols.append(c)
-    else:
-        num_cols.append(c)
+# Exclusiones específicas para el "Saturado Comparable" (mismo universo de información que el híbrido)
+# Excluye las satisfacciones adicionales y las derivadas excluidas de la serialización
+EXCLUIR_COMPARABLE = [
+    'satisfaccion_ingresos', 'satisfaccion_tiempo_libre', 'satisfaccion_seguridad',
+    'ingreso', 'ingreso_mensual_hogar', 'ingreso_mensual_unidad_gasto',
+    'ingreso_mensual_empleo', 'ingreso_mensual_otra_unidad',
+    'ingreso_total', 'ingreso_per_capita',
+    'edad', 'fecha_nacimiento', 'grado_aprobado', 'REGION'
+]
 
-for c in num_cols:
-    X_raw[c] = pd.to_numeric(X_raw[c], errors='coerce')
+cols_keep_full = [c for c in base_raw.columns if c not in cols_to_drop]
+cols_keep_comp = [c for c in base_raw.columns if c not in cols_to_drop and c not in EXCLUIR_COMPARABLE]
 
-for c in cat_cols:
-    X_raw[c] = X_raw[c].fillna('No aplica').astype(str)
+def dummificar_matriz(columnas):
+    X_sub = base_raw[columnas].copy()
+    cat_c, num_c = [], []
+    for c in X_sub.columns:
+        if X_sub[c].dtype == 'object' or X_sub[c].nunique() < 15:
+            cat_c.append(c)
+        else:
+            num_c.append(c)
+    for c in num_c:
+        X_sub[c] = pd.to_numeric(X_sub[c], errors='coerce').fillna(0)
+    for c in cat_c:
+        X_sub[c] = X_sub[c].fillna('No aplica').astype(str)
+    
+    X_d = pd.get_dummies(X_sub[cat_c], drop_first=True)
+    X_out = pd.concat([X_sub[num_c], X_d], axis=1)
+    X_out.columns = [re.sub(r'[^\w]', '_', str(c)) for c in X_out.columns]
+    return X_out
 
-X_dummies_sat = pd.get_dummies(X_raw[cat_cols], drop_first=True)
-X_trad_ampliada = pd.concat([X_raw[num_cols], X_dummies_sat], axis=1)
-X_trad_ampliada.columns = [re.sub(r'[^\w]', '_', str(c)) for c in X_trad_ampliada.columns]
+print('Dummificando Matriz Saturada Completa...')
+X_trad_ampliada = dummificar_matriz(cols_keep_full)
+
+print('Dummificando Matriz Saturada Comparable (Mismo universo del híbrido)...')
+X_sat_comparable = dummificar_matriz(cols_keep_comp)
+
+print('Construyendo Matriz Saturada + Embeddings OpenAI...')
+X_sat_plus_openai = pd.concat([X_trad_ampliada, openai_df], axis=1)
+
+print(f'Dimensiones reales (p columnas):')
+print(f'  - Clásico: p = {X_trad.shape[1]}')
+print(f'  - Híbrido OpenAI: p = {X_hib_openai.shape[1]}')
+print(f'  - Saturado Comparable: p = {X_sat_comparable.shape[1]}')
+print(f'  - Saturado Completo: p = {X_trad_ampliada.shape[1]}')
+print(f'  - Saturado + OpenAI: p = {X_sat_plus_openai.shape[1]}')
 
 pesos = base_modelo_ml['FEX_C']
 
-def evaluar_modelo_10_folds_con_holdout(X_mat, var_target, tipo_modelo='lgb'):
+# Partición 90% Dev / 10% Test Holdout agrupado por hogar
+gss = GroupShuffleSplit(n_splits=1, test_size=0.10, random_state=42)
+dev_idx, test_idx = next(gss.split(base_modelo_ml, groups=hogar_id))
+
+def evaluar_modelo(X_mat, var_target, tipo_modelo='lgb'):
     y = base_modelo_ml[var_target]
-    
-    # 1. Reservar 10% de Test Holdout agrupado por hogar
-    gss = GroupShuffleSplit(n_splits=1, test_size=0.10, random_state=42)
-    dev_idx, test_idx = next(gss.split(X_mat, y, groups=hogar_id))
     
     X_dev, y_dev, w_dev, hogar_dev = X_mat.iloc[dev_idx], y.iloc[dev_idx], pesos.iloc[dev_idx], hogar_id.iloc[dev_idx]
     X_te, y_te, w_te = X_mat.iloc[test_idx], y.iloc[test_idx], pesos.iloc[test_idx]
     
-    # 2. Ejecutar 10-Fold GroupKFold sobre el 90% de desarrollo
     gkf = GroupKFold(n_splits=10)
-    r2_val_l, rmse_val_l, mae_val_l, tau_val_l = [], [], [], []
+    r2_folds, rmse_folds, mae_folds, tau_folds = [], [], [], []
     
     for train_idx, val_idx in gkf.split(X_dev, y_dev, groups=hogar_dev):
         X_tr, X_val = X_dev.iloc[train_idx], X_dev.iloc[val_idx]
@@ -132,14 +163,13 @@ def evaluar_modelo_10_folds_con_holdout(X_mat, var_target, tipo_modelo='lgb'):
             model.fit(X_tr_sc, y_tr, sample_weight=w_tr)
             y_pred_val = model.predict(X_val_sc)
             
-        r2_val_l.append(r2_score(y_val, y_pred_val, sample_weight=w_val))
-        rmse_val_l.append(np.sqrt(mean_squared_error(y_val, y_pred_val, sample_weight=w_val)))
-        mae_val_l.append(mean_absolute_error(y_val, y_pred_val, sample_weight=w_val))
-        
+        r2_folds.append(r2_score(y_val, y_pred_val, sample_weight=w_val))
+        rmse_folds.append(np.sqrt(mean_squared_error(y_val, y_pred_val, sample_weight=w_val)))
+        mae_folds.append(mean_absolute_error(y_val, y_pred_val, sample_weight=w_val))
         t_val, _ = kendalltau(y_val, y_pred_val)
-        tau_val_l.append(t_val)
+        tau_folds.append(t_val)
         
-    # 3. Entrenamiento en el 90% de desarrollo y evaluación en Test Holdout (10%)
+    # Ajuste en Dev (90%) y predicción en Test (10%)
     if tipo_modelo == 'lgb':
         model_final = lgb.LGBMRegressor(n_estimators=100, random_state=42, verbose=-1, n_jobs=4)
         model_final.fit(X_dev, y_dev, sample_weight=w_dev)
@@ -153,57 +183,129 @@ def evaluar_modelo_10_folds_con_holdout(X_mat, var_target, tipo_modelo='lgb'):
         y_pred_te = model_final.predict(X_te_sc)
         
     r2_te = r2_score(y_te, y_pred_te, sample_weight=w_te)
+    rmse_te = np.sqrt(mean_squared_error(y_te, y_pred_te, sample_weight=w_te))
+    mae_te = mean_absolute_error(y_te, y_pred_te, sample_weight=w_te)
+    tau_te, _ = kendalltau(y_te, y_pred_te)
     
-    r2_val_str = f"{np.mean(r2_val_l):.3f} \\pm {np.std(r2_val_l):.3f}"
-    rmse_val_str = f"{np.mean(rmse_val_l):.3f} \\pm {np.std(rmse_val_l):.3f}"
-    mae_val_str = f"{np.mean(mae_val_l):.3f} \\pm {np.std(mae_val_l):.3f}"
-    tau_val_str = f"{np.mean(tau_val_l):.3f} \\pm {np.std(tau_val_l):.3f}"
+    res_resumen = {
+        'R2 (10-Folds Val)': f"{np.mean(r2_folds):.3f} \\pm {np.std(r2_folds):.3f}",
+        'R2 (Test 10% Holdout)': f"{r2_te:.3f}",
+        'Kendall Tau (Test)': f"{tau_te:.3f}",
+        'RMSE (Test)': f"{rmse_te:.3f}",
+        'MAE (Test)': f"{mae_te:.3f}",
+        'p_dimension': X_mat.shape[1]
+    }
     
-    return r2_val_str, f"{r2_te:.3f}", tau_val_str, rmse_val_str, mae_val_str
+    return res_resumen, r2_folds, y_pred_te
 
+# Definición de modelos a evaluar
 modelos = [
-    ('01. Tradicional (LightGBM)', X_trad, 'lgb'),
-    ('02. Tradicional (Ridge)', X_trad, 'ridge'),
-    ('03. Estructurado Saturado (LightGBM)', X_trad_ampliada, 'lgb'),
-    ('04. Estructurado Saturado (Ridge)', X_trad_ampliada, 'ridge'),
-    ('05. Solo Qwen (LightGBM)', qwen_mat, 'lgb'),
-    ('06. Solo Qwen (Ridge)', qwen_mat, 'ridge'),
-    ('07. Solo OpenAI (LightGBM)', openai_df, 'lgb'),
-    ('08. Solo OpenAI (Ridge)', openai_df, 'ridge'),
-    ('09. Híbrido Qwen (LightGBM)', X_hib_qwen, 'lgb'),
-    ('10. Híbrido Qwen (Ridge)', X_hib_qwen, 'ridge'),
-    ('11. Híbrido OpenAI (LightGBM)', X_hib_openai, 'lgb'),
-    ('12. Híbrido OpenAI (Ridge)', X_hib_openai, 'ridge')
+    ('01. Estructurado Clásico (LightGBM)', X_trad, 'lgb'),
+    ('02. Estructurado Clásico (Ridge)', X_trad, 'ridge'),
+    ('03. Estructurado Saturado Comparable (LightGBM)', X_sat_comparable, 'lgb'),
+    ('04. Estructurado Saturado Comparable (Ridge)', X_sat_comparable, 'ridge'),
+    ('05. Estructurado Saturado Completo (LightGBM)', X_trad_ampliada, 'lgb'),
+    ('06. Estructurado Saturado Completo (Ridge)', X_trad_ampliada, 'ridge'),
+    ('07. Solo Qwen (LightGBM)', qwen_mat, 'lgb'),
+    ('08. Solo Qwen (Ridge)', qwen_mat, 'ridge'),
+    ('09. Solo OpenAI (LightGBM)', openai_df, 'lgb'),
+    ('10. Solo OpenAI (Ridge)', openai_df, 'ridge'),
+    ('11. Híbrido Qwen (LightGBM)', X_hib_qwen, 'lgb'),
+    ('12. Híbrido Qwen (Ridge)', X_hib_qwen, 'ridge'),
+    ('13. Híbrido OpenAI (LightGBM)', X_hib_openai, 'lgb'),
+    ('14. Híbrido OpenAI (Ridge)', X_hib_openai, 'ridge'),
+    ('15. Saturado Completo + OpenAI (LightGBM)', X_sat_plus_openai, 'lgb'),
+    ('16. Saturado Completo + OpenAI (Ridge)', X_sat_plus_openai, 'ridge')
 ]
 
 out_excel = os.path.join(RUTA_DATOS, 'resultados_group_kfold_y_holdout.xlsx')
-res_eval, res_exp_puro = [], []
+res_eval, res_exp = [], []
+folds_eval_dict, folds_exp_dict = {}, {}
+preds_test_eval, preds_test_exp = {}, {}
 
-print('\n=== INICIANDO EVALUACIÓN CON 10-FOLDS GROUP KFOLD + TEST HOLDOUT 10% (POR HOGAR) ===')
+# Submuestra test para OE5 (desglose)
+df_test = base_trabajo.iloc[test_idx].copy()
+df_test['FEX_C_test'] = pesos.iloc[test_idx]
+
+print('\n=== INICIANDO EVALUACIÓN CON 10-FOLDS GROUP KFOLD + TEST HOLDOUT 10% ===')
 for nombre, X_m, m_type in modelos:
-    print(f'Evaluando: {nombre} | Bienestar Evaluativo...')
-    r2_v, r2_te, tau, rmse, mae = evaluar_modelo_10_folds_con_holdout(X_m, var_eval, tipo_modelo=m_type)
-    res_eval.append({'Modelo': nombre, 'R2 (10-Folds Val)': r2_v, 'R2 (Test 10% Holdout)': r2_te, 'Kendall Tau (Test)': tau, 'RMSE (Test)': rmse, 'MAE (Test)': mae})
+    print(f'--> Evaluando: {nombre} | Evaluativo...')
+    res_m, r2_f, y_pr = evaluar_modelo(X_m, var_eval, tipo_modelo=m_type)
+    res_m['Modelo'] = nombre
+    res_eval.append(res_m)
+    folds_eval_dict[nombre] = r2_f
+    preds_test_eval[nombre] = y_pr
 
-    print(f'Evaluando: {nombre} | Bienestar Experiencial (Afectivo Puro)...')
-    r2_v, r2_te, tau, rmse, mae = evaluar_modelo_10_folds_con_holdout(X_m, var_exp_puro, tipo_modelo=m_type)
-    res_exp_puro.append({'Modelo': nombre, 'R2 (10-Folds Val)': r2_v, 'R2 (Test 10% Holdout)': r2_te, 'Kendall Tau (Test)': tau, 'RMSE (Test)': rmse, 'MAE (Test)': mae})
+    print(f'--> Evaluando: {nombre} | Experiencial (Afectivo Puro)...')
+    res_m_exp, r2_f_exp, y_pr_exp = evaluar_modelo(X_m, var_exp_puro, tipo_modelo=m_type)
+    res_m_exp['Modelo'] = nombre
+    res_exp.append(res_m_exp)
+    folds_exp_dict[nombre] = r2_f_exp
+    preds_test_exp[nombre] = y_pr_exp
 
-    with pd.ExcelWriter(out_excel) as writer:
-        pd.DataFrame(res_eval).to_excel(writer, sheet_name='Evaluativo', index=False)
-        pd.DataFrame(res_exp_puro).to_excel(writer, sheet_name='Experiencial Puro', index=False)
+# Cálculo de diferencias pareadas pliegue a pliegue (Fold-by-Fold Paired Differences)
+def calcular_diferencias_pareadas(folds_dict, target_label):
+    pares = [
+        ('Híbrido OpenAI (LGBM) vs Clásico (LGBM)', '13. Híbrido OpenAI (LightGBM)', '01. Estructurado Clásico (LightGBM)'),
+        ('Híbrido OpenAI (Ridge) vs Clásico (Ridge)', '14. Híbrido OpenAI (Ridge)', '02. Estructurado Clásico (Ridge)'),
+        ('Híbrido Qwen (LGBM) vs Clásico (LGBM)', '11. Híbrido Qwen (LightGBM)', '01. Estructurado Clásico (LightGBM)'),
+        ('Híbrido Qwen (Ridge) vs Clásico (Ridge)', '12. Híbrido Qwen (Ridge)', '02. Estructurado Clásico (Ridge)'),
+        ('Saturado Comp (LGBM) vs Híbrido OpenAI (LGBM)', '03. Estructurado Saturado Comparable (LightGBM)', '13. Híbrido OpenAI (LightGBM)'),
+        ('Saturado Comp (Ridge) vs Híbrido OpenAI (Ridge)', '04. Estructurado Saturado Comparable (Ridge)', '14. Híbrido OpenAI (Ridge)'),
+        ('Saturado+OpenAI (LGBM) vs Saturado Completo (LGBM)', '15. Saturado Completo + OpenAI (LightGBM)', '05. Estructurado Saturado Completo (LightGBM)')
+    ]
+    diff_records = []
+    for comp_name, m_a, m_b in pares:
+        if m_a in folds_dict and m_b in folds_dict:
+            arr_a = np.array(folds_dict[m_a])
+            arr_b = np.array(folds_dict[m_b])
+            diff = arr_a - arr_b
+            diff_records.append({
+                'Comparación': comp_name,
+                'Variable': target_label,
+                'Delta_Media (R2)': np.mean(diff),
+                'Delta_DE (R2)': np.std(diff),
+                'IC_95_Inf': np.mean(diff) - 1.96 * np.std(diff) / np.sqrt(len(diff)),
+                'IC_95_Sup': np.mean(diff) + 1.96 * np.std(diff) / np.sqrt(len(diff)),
+                'P-valor (t pareada)': np.nan if np.std(diff)==0 else (np.mean(diff) / (np.std(diff)/np.sqrt(len(diff))))
+            })
+    return pd.DataFrame(diff_records)
 
-df_eval_res = pd.DataFrame(res_eval)
-df_exp_puro_res = pd.DataFrame(res_exp_puro)
+df_diff_eval = calcular_diferencias_pareadas(folds_eval_dict, 'Evaluativo')
+df_diff_exp = calcular_diferencias_pareadas(folds_exp_dict, 'Experiencial Puro')
+df_diff_total = pd.concat([df_diff_eval, df_diff_exp], ignore_index=True)
 
-print('\n=================================================================================')
-print('CUADRO DE RESULTADOS DEFINITIVOS (10-FOLDS + HOLDOUT): BIENESTAR EVALUATIVO')
-print('=================================================================================')
-print(df_eval_res.to_string(index=False))
+# Desempeño por Subgrupos (Sexo y Edad) en Test Set para OE5
+subgrupos_records = []
+for var_name, y_true, preds_dict in [('Evaluativo', df_test['satisfaccion_vida'], preds_test_eval),
+                                      ('Experiencial', (base_raw.iloc[test_idx]['felicidad_ayer'] + base_raw.iloc[test_idx]['preocupacion_ayer_inv'] + base_raw.iloc[test_idx]['tristeza_ayer_inv'])/3.0, preds_test_exp)]:
+    modelos_oe5 = [
+        ('Clásico (LGBM)', '01. Estructurado Clásico (LightGBM)'),
+        ('Híbrido OpenAI (LGBM)', '13. Híbrido OpenAI (LightGBM)'),
+        ('Saturado Comp (LGBM)', '03. Estructurado Saturado Comparable (LightGBM)')
+    ]
+    for mod_label, mod_key in modelos_oe5:
+        if mod_key in preds_dict:
+            y_p = preds_dict[mod_key]
+            for sexo in df_test['sexo_nacimiento'].unique():
+                m_s = (df_test['sexo_nacimiento'] == sexo)
+                r2_s = r2_score(y_true[m_s], y_p[m_s], sample_weight=df_test.loc[m_s, 'FEX_C_test'])
+                subgrupos_records.append({'Variable': var_name, 'Modelo': mod_label, 'Subgrupo': 'Sexo', 'Categoria': str(sexo), 'R2_Test': r2_s})
+            for grupo_e in df_test['grupo_edad'].unique():
+                m_e = (df_test['grupo_edad'] == grupo_e)
+                r2_e = r2_score(y_true[m_e], y_p[m_e], sample_weight=df_test.loc[m_e, 'FEX_C_test'])
+                subgrupos_records.append({'Variable': var_name, 'Modelo': mod_label, 'Subgrupo': 'Grupo_Edad', 'Categoria': str(grupo_e), 'R2_Test': r2_e})
 
-print('\n=================================================================================')
-print('CUADRO DE RESULTADOS DEFINITIVOS (10-FOLDS + HOLDOUT): BIENESTAR EXPERIENCIAL')
-print('=================================================================================')
-print(df_exp_puro_res.to_string(index=False))
+df_oe5 = pd.DataFrame(subgrupos_records)
 
-print(f'\n¡Evaluación finalizada exitosamente! Resultados guardados en: {out_excel}')
+# Guardar todos los resultados consolidados en Excel
+with pd.ExcelWriter(out_excel) as writer:
+    pd.DataFrame(res_eval).to_excel(writer, sheet_name='Evaluativo', index=False)
+    pd.DataFrame(res_exp).to_excel(writer, sheet_name='Experiencial Puro', index=False)
+    df_diff_total.to_excel(writer, sheet_name='Diferencias_Pareadas', index=False)
+    pd.DataFrame(folds_eval_dict).to_excel(writer, sheet_name='Folds_Raw_Evaluativo', index=False)
+    pd.DataFrame(folds_exp_dict).to_excel(writer, sheet_name='Folds_Raw_Experiencial', index=False)
+    df_oe5.to_excel(writer, sheet_name='Desempeño_Subgrupos_OE5', index=False)
+
+print(f'\n¡Evaluación integral finalizada con éxito!')
+print(f'Resultados consolidados guardados en: {out_excel}')

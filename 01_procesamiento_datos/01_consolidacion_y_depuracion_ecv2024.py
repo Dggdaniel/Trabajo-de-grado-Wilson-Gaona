@@ -9,10 +9,9 @@ warnings.filterwarnings('ignore')
 RUTA_BASE = os.path.dirname(os.path.abspath(__file__))
 RUTA_DATOS = os.path.abspath(os.path.join(RUTA_BASE, '..', '..'))
 
-print('=== 01_CONSOLIDACION_Y_DEPURACION_ECV2024.PY (AUDITADO) ===')
-print('1. Cargando microdatos originales de la Encuesta de Calidad de Vida (ECV 2024)...')
+print('=== 01_CONSOLIDACION_Y_DEPURACION_ECV2024.PY ===')
+print('1. Cargando microdatos de la Encuesta de Calidad de Vida (ECV 2024)...')
 
-# Carga de datos reales sin fallbacks ficticios ni imputaciones de aleatorios
 input_file = os.path.join(RUTA_DATOS, 'validacion_final.xlsx')
 
 if not os.path.exists(input_file):
@@ -25,13 +24,13 @@ print(f'  - Microdatos cargados exitosamente: {len(base_unificada):,} observacio
 print('2. Verificando llaves de agregación por clúster de hogar (DIRECTORIO + SECUENCIA_P)...')
 if 'DIRECTORIO' in base_unificada.columns and 'SECUENCIA_P' in base_unificada.columns:
     hogar_id = base_unificada['DIRECTORIO'].astype(str) + '_' + base_unificada['SECUENCIA_P'].astype(str)
-    print(f'  - Total de clústeres de hogar identificados: {hogar_id.nunique():,} hogares.')
+    n_hogares = hogar_id.nunique()
+    print(f'  - Total de clústeres de hogar identificados: {n_hogares:,} hogares.')
+    print(f'  - Promedio de personas por hogar: {len(base_unificada) / n_hogares:.2f}')
 
-print('3. Construcción del índice de Bienestar Experiencial (Afectivo Puro, escala 0-10)...')
+print('3. Construcción y auditoría psicométrica del índice de Bienestar Experiencial (Afectivo Puro)...')
 # Constructo afectivo puro (Kahneman & Deaton, 2010):
 # Promedio de felicidad_ayer y las emociones negativas invertidas (10 - preocupacion_ayer, 10 - tristeza_ayer).
-# Se excluyen medidas evaluativas o eudaimónicas (vida_vale_la_pena, escalera_situacion_actual).
-
 cols_afectivas = ['felicidad_ayer', 'preocupacion_ayer', 'tristeza_ayer']
 if all(c in base_unificada.columns for c in cols_afectivas):
     preocupacion_inv = 10.0 - base_unificada['preocupacion_ayer']
@@ -39,9 +38,27 @@ if all(c in base_unificada.columns for c in cols_afectivas):
     base_unificada['bienestar_experiencial'] = (
         base_unificada['felicidad_ayer'] + preocupacion_inv + tristeza_inv
     ) / 3.0
+    
+    # Cálculo de Consistencia Interna (Alfa de Cronbach)
+    df_items = pd.DataFrame({
+        'felicidad': base_unificada['felicidad_ayer'],
+        'no_preocupacion': preocupacion_inv,
+        'no_tristeza': tristeza_inv
+    })
+    k = df_items.shape[1]
+    var_items = df_items.var(axis=0, ddof=1).sum()
+    var_total = df_items.sum(axis=1).var(ddof=1)
+    cronbach_alpha = (k / (k - 1.0)) * (1.0 - (var_items / var_total))
+    
+    corr_spearman = base_unificada[['bienestar_experiencial', 'satisfaccion_vida']].corr(method='spearman').iloc[0, 1]
+    corr_pearson = base_unificada[['bienestar_experiencial', 'satisfaccion_vida']].corr(method='pearson').iloc[0, 1]
+    
+    print(f'  - Consistencia Interna (Alfa de Cronbach): {cronbach_alpha:.4f}')
+    print(f'  - Correlación con Satisfacción con la Vida: Pearson = {corr_pearson:.4f}, Spearman = {corr_spearman:.4f}')
 
-print('4. Validación de rangos y completitud sobre la muestra analítica (n = 178.511)...')
-print(f'  - Bienestar Experiencial (Rango: {base_unificada["bienestar_experiencial"].min():.2f} - {base_unificada["bienestar_experiencial"].max():.2f}, Media: {base_unificada["bienestar_experiencial"].mean():.2f})')
-print(f'  - Satisfacción con la Vida (Rango: {base_unificada["satisfaccion_vida"].min():.2f} - {base_unificada["satisfaccion_vida"].max():.2f}, Media: {base_unificada["satisfaccion_vida"].mean():.2f})')
+print('\n4. Validación de completitud muestral:')
+print(f'  - Total registros analíticos: {len(base_unificada):,}')
+print(f'  - Bienestar Experiencial (Media: {base_unificada["bienestar_experiencial"].mean():.2f}, DE: {base_unificada["bienestar_experiencial"].std():.2f})')
+print(f'  - Satisfacción con la Vida (Media: {base_unificada["satisfaccion_vida"].mean():.2f}, DE: {base_unificada["satisfaccion_vida"].std():.2f})')
 
 print('\n¡Procesamiento y depuración finalizados exitosamente!')
