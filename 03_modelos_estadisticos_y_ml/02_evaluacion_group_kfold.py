@@ -18,7 +18,12 @@ RUTA_DATOS = os.path.abspath(os.path.join(RUTA_BASE, '..', '..'))
 
 print('=== PASO 1: CARGANDO MICRODATOS Y LLAVES DE HOGAR POR LLAVE COMPUESTA ===')
 base_trabajo = pd.read_excel(os.path.join(RUTA_DATOS, 'validacion_final.xlsx'))
+if 'satisfaccion_trabajo' in base_trabajo.columns and 'satisfaccion_ocupacion' not in base_trabajo.columns:
+    base_trabajo['satisfaccion_ocupacion'] = base_trabajo['satisfaccion_trabajo']
+
 base_raw = pd.read_csv(os.path.join(RUTA_DATOS, 'base_final_embedings.csv'))
+if 'satisfaccion_trabajo' in base_raw.columns and 'satisfaccion_ocupacion' not in base_raw.columns:
+    base_raw['satisfaccion_ocupacion'] = base_raw['satisfaccion_trabajo']
 
 # Llave única compuesta para evitar desalineaciones por posición de fila
 hogar_id = base_raw['DIRECTORIO'].astype(str) + '_' + base_raw['SECUENCIA_P'].astype(str)
@@ -46,7 +51,7 @@ qwen_mat.index = base_trabajo.index
 print('\n=== PASO 3: CONSTRUYENDO MATRIZ CLÁSICA / TRADICIONAL ===')
 variables_tradicionales = [
     'sexo_nacimiento', 'FEX_C', 'nivel_educativo_alcanzado',
-    'ingreso_total_log', 'estado_conyugal', 'satisfaccion_trabajo',
+    'ingreso_total_log', 'estado_conyugal', 'satisfaccion_ocupacion',
     'satisfaccion_salud', 'P1_DEPARTAMENTO', 'grupo_edad'
 ]
 
@@ -62,7 +67,7 @@ base_modelo_ml[var_exp_puro] = (
     base_raw['felicidad_ayer'] + base_raw['preocupacion_ayer_inv'] + base_raw['tristeza_ayer_inv']
 ) / 3.0
 
-categoricas = ['sexo_nacimiento', 'nivel_educativo_alcanzado', 'estado_conyugal', 'satisfaccion_trabajo', 'satisfaccion_salud', 'grupo_edad', 'P1_DEPARTAMENTO']
+categoricas = ['sexo_nacimiento', 'nivel_educativo_alcanzado', 'estado_conyugal', 'satisfaccion_ocupacion', 'satisfaccion_salud', 'grupo_edad', 'P1_DEPARTAMENTO']
 splines = dmatrix('bs(ingreso_total_log, df=4, degree=3, include_intercept=False) - 1', {'ingreso_total_log': base_modelo_ml['ingreso_total_log']}, return_type='dataframe')
 X_dummies = pd.get_dummies(base_modelo_ml[categoricas], drop_first=True)
 X_trad = pd.concat([X_dummies, splines], axis=1)

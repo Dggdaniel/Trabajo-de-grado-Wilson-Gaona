@@ -14,6 +14,8 @@ RUTA_DATOS = os.path.abspath(os.path.join(RUTA_BASE, '..', '..'))
 print('=== MODELOS ESTADÍSTICOS TRADICIONALES DE REFERENCIA (CON Y SIN DOMINIOS) ===')
 print('1. Cargando microdatos depurados de la ECV 2024...')
 df = pd.read_excel(os.path.join(RUTA_DATOS, 'validacion_final.xlsx'))
+if 'satisfaccion_trabajo' in df.columns and 'satisfaccion_ocupacion' not in df.columns:
+    df['satisfaccion_ocupacion'] = df['satisfaccion_trabajo']
 base_raw = pd.read_csv(
     os.path.join(RUTA_DATOS, 'base_final_embedings.csv'),
     usecols=['DIRECTORIO', 'SECUENCIA_P', 'felicidad_ayer', 'preocupacion_ayer_inv', 'tristeza_ayer_inv']
@@ -30,8 +32,8 @@ cols_sin_dominios = [
     'nivel_educativo_alcanzado', 'estado_conyugal', 'P1_DEPARTAMENTO'
 ]
 
-# Especificación completa (con satisfacciones de dominio: salud y trabajo)
-cols_con_dominios = cols_sin_dominios + ['satisfaccion_salud', 'satisfaccion_trabajo']
+# Especificación completa (con satisfacciones de dominio: salud y ocupación)
+cols_con_dominios = cols_sin_dominios + ['satisfaccion_salud', 'satisfaccion_ocupacion']
 
 pesos = df['FEX_C']
 y_eval = df['satisfaccion_vida'].astype(int)
@@ -45,7 +47,7 @@ print('='*70)
 
 # 1A. Logit sin dominios
 X_eval_sin = pd.get_dummies(df[cols_sin_dominios], drop_first=True, dtype=float)
-print(f'-> Ajustando Logit sin satisfacciones de salud ni trabajo (p = {X_eval_sin.shape[1]})...')
+print(f'-> Ajustando Logit sin satisfacciones de salud ni ocupación (p = {X_eval_sin.shape[1]})...')
 mod_logit_sin = OrderedModel(y_eval, X_eval_sin, distr='logit')
 res_logit_sin = mod_logit_sin.fit(method='bfgs', cov_type='cluster', cov_kwds={'groups': df['cluster_hogar']}, disp=False)
 coef_ing_sin = res_logit_sin.params['ingreso_total_log']
@@ -54,7 +56,7 @@ print(f'   Ingreso total log (sin dominios): Coef = {coef_ing_sin:.4f}, p = {pva
 
 # 1B. Logit con dominios
 X_eval_con = pd.get_dummies(df[cols_con_dominios], drop_first=True, dtype=float)
-print(f'-> Ajustando Logit con satisfacciones de salud y trabajo (p = {X_eval_con.shape[1]})...')
+print(f'-> Ajustando Logit con satisfacciones de salud y ocupación (p = {X_eval_con.shape[1]})...')
 mod_logit_con = OrderedModel(y_eval, X_eval_con, distr='logit')
 res_logit_con = mod_logit_con.fit(method='bfgs', cov_type='cluster', cov_kwds={'groups': df['cluster_hogar']}, disp=False)
 coef_ing_con = res_logit_con.params['ingreso_total_log']

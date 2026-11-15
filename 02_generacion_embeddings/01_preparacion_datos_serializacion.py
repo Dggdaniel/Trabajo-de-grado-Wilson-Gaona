@@ -37,7 +37,7 @@ EXCLUIR_DEPENDIENTES = [
 # 3. Variables principales del modelo tradicional (02_evaluacion_group_kfold.py)
 EXCLUIR_TRADICIONALES = [
     'sexo_nacimiento', 'nivel_educativo_alcanzado', 'ingreso_total_log',
-    'estado_conyugal', 'satisfaccion_trabajo', 'satisfaccion_salud',
+    'estado_conyugal', 'satisfaccion_ocupacion', 'satisfaccion_trabajo', 'satisfaccion_salud',
     'P1_DEPARTAMENTO', 'grupo_edad', 'satisfaccion_ingresos', 
     'satisfaccion_tiempo_libre', 'satisfaccion_seguridad'
 ]
